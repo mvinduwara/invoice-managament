@@ -14,17 +14,26 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (token) {
       axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      fetchCurrentUser()
+      // Fix: Skip the secondary fetch if the user object is already loaded
+      if (!user) {
+        fetchCurrentUser(token)
+      } else {
+        setLoading(false)
+      }
     } else {
       setLoading(false)
     }
-  }, [token])
+  }, [token]) 
 
-  const fetchCurrentUser = async () => {
+  const fetchCurrentUser = async (currentToken) => {
     try {
-      const { data } = await axiosInstance.get('/api/auth/me')
-      setUser(data)
-    } catch {
+      // Fix: Explicitly attach the header to bypass any Axios timing issues
+      const { data } = await axiosInstance.get('/api/auth/me', {
+        headers: { Authorization: `Bearer ${currentToken}` }
+      })
+      setUser({ id: data.id, username: data.username, email: data.email })
+    } catch (err) {
+      console.error("Session verification failed:", err)
       logout()
     } finally {
       setLoading(false)
@@ -33,22 +42,30 @@ export function AuthProvider({ children }) {
 
   const login = async (credentials) => {
     const { data } = await axiosInstance.post('/api/auth/login', credentials)
-    const { token: jwt, user: userData } = data
+    const jwt = data.token
+    const loggedInUser = { id: data.id, username: data.username, email: data.email }
+    
     localStorage.setItem('token', jwt)
     axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${jwt}`
+    
+    setUser(loggedInUser)
     setToken(jwt)
-    setUser(userData)
-    toast.success(`Welcome back, ${userData.firstName}!`)
+    
+    toast.success(`Welcome back, ${data.username}!`)
     navigate('/dashboard')
   }
 
   const register = async (userData) => {
     const { data } = await axiosInstance.post('/api/auth/register', userData)
-    const { token: jwt, user: newUser } = data
+    const jwt = data.token
+    const newUser = { id: data.id, username: data.username, email: data.email }
+    
     localStorage.setItem('token', jwt)
     axiosInstance.defaults.headers.common['Authorization'] = `Bearer ${jwt}`
-    setToken(jwt)
+    
     setUser(newUser)
+    setToken(jwt)
+    
     toast.success('Account created successfully!')
     navigate('/dashboard')
   }
