@@ -31,7 +31,6 @@ export default function Login() {
       }
       
       await login(payload)
-      // No navigate() needed here anymore, AuthContext handles it!
     } catch (err) {
       const errorData = err.response?.data
       const errorMessage = typeof errorData === 'string' 
