@@ -77,7 +77,6 @@ public class WebSecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
-                        // FIX: Added "/error" here so missing endpoints return 404 instead of 401
                         auth.requestMatchers("/api/auth/**", "/error").permitAll()
                                 .anyRequest().authenticated()
                 );

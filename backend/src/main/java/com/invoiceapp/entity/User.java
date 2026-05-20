@@ -19,4 +19,12 @@ public class User {
     private String username;
     private String email;
     private String password;
+
+    private String businessName;
+    private String businessAddress;
+
+    public String getBusinessName() { return businessName; }
+    public void setBusinessName(String businessName) { this.businessName = businessName; }
+    public String getBusinessAddress() { return businessAddress; }
+    public void setBusinessAddress(String businessAddress) { this.businessAddress = businessAddress; }
 }

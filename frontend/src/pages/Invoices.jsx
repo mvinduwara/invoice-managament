@@ -1,239 +1,161 @@
 import React, { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { FiPlus, FiDownload, FiCheckCircle, FiSearch } from 'react-icons/fi'
 import toast from 'react-hot-toast'
-import {
-  FiPlus, FiEdit2, FiTrash2, FiSend,
-  FiSearch, FiFilter, FiDownload
-} from 'react-icons/fi'
 import { invoicesApi } from '../api/invoices'
-import Badge from '../components/common/Badge'
-import Button from '../components/common/Button'
 import { formatCurrency, formatDate } from '../utils/formatters'
+import Badge from '../components/common/Badge'
 
 export default function Invoices() {
-  const [search, setSearch]     = useState('')
-  const [status, setStatus]     = useState('')
-  const [page, setPage]         = useState(0)
-  const queryClient             = useQueryClient()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['invoices', { search, status, page }],
-    queryFn: () => invoicesApi.getAll({
-      page, size: 10, search, status: status || undefined,
-      sort: 'createdAt,desc',
-    }).then((r) => r.data),
-    keepPreviousData: true,
+  const { data: invoices, isLoading, refetch } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: () => invoicesApi.getAll().then((res) => res.data),
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: invoicesApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      toast.success('Invoice deleted')
-    },
-    onError: () => toast.error('Failed to delete invoice'),
-  })
-
-  const sendMutation = useMutation({
-    mutationFn: invoicesApi.send,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      toast.success('Invoice sent to customer!')
-    },
-    onError: () => toast.error('Failed to send invoice'),
-  })
+  const filteredInvoices = invoices?.filter((inv) => {
+    const matchesSearch = inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (inv.customer?.name && inv.customer.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesStatus = statusFilter === 'All' || inv.status === statusFilter
+    return matchesSearch && matchesStatus
+  }) || []
 
   const handleDownload = async (id, invoiceNumber) => {
     try {
+      const toastId = toast.loading('Generating PDF...')
       const response = await invoicesApi.download(id)
-      const url      = window.URL.createObjectURL(new Blob([response.data]))
-      const link     = document.createElement('a')
-      link.href      = url
+      
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+      const link = document.createElement('a')
+      link.href = url
       link.setAttribute('download', `${invoiceNumber}.pdf`)
       document.body.appendChild(link)
       link.click()
       link.remove()
-      toast.success('Invoice downloaded!')
-    } catch {
+      
+      toast.success('Download complete!', { id: toastId })
+    } catch (error) {
       toast.error('Failed to download PDF')
     }
   }
 
-  const invoices = data?.content || []
-  const totalPages = data?.totalPages || 0
+  const handleMarkPaid = async (id) => {
+    try {
+      await invoicesApi.markPaid(id)
+      toast.success('Invoice marked as paid!')
+      refetch() 
+    } catch (error) {
+      toast.error('Failed to update status')
+    }
+  }
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-100">Invoices</h2>
-          <p className="text-slate-400 text-sm mt-0.5">
-            {data?.totalElements || 0} total invoices
-          </p>
-        </div>
-        <Link to="/invoices/new">
-          <Button><FiPlus size={16} /> New Invoice</Button>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold text-slate-100">Invoices</h2>
+        <Link
+          to="/invoices/create"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium flex items-center gap-2 transition-colors w-fit"
+        >
+          <FiPlus /> Create Invoice
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="glass-card p-4">
-        <div className="flex flex-wrap gap-3">
-          <div className="relative flex-1 min-w-64">
-            <FiSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+      <div className="glass-card p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div className="flex gap-2 p-1 bg-slate-800/50 rounded-lg w-fit border border-slate-700/50">
+            {['All', 'Sent', 'Paid', 'Overdue'].map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  statusFilter === status
+                    ? 'bg-slate-700 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative w-full md:w-64">
+            <FiSearch className="absolute left-3 top-2.5 text-slate-400" />
             <input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+              type="text"
               placeholder="Search invoices..."
-              className="form-input pl-10"
+              className="w-full bg-slate-800/50 border border-slate-700 rounded-lg py-2 pl-9 pr-4 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <FiFilter size={16} className="text-slate-400" />
-            <select
-              value={status}
-              onChange={(e) => { setStatus(e.target.value); setPage(0) }}
-              className="form-input w-40"
-            >
-              <option value="">All Statuses</option>
-              <option value="DRAFT">Draft</option>
-              <option value="SENT">Sent</option>
-              <option value="PAID">Paid</option>
-              <option value="OVERDUE">Overdue</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
-          </div>
         </div>
-      </div>
 
-      {/* Table */}
-      <div className="glass-card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-700">
-              {['Invoice #', 'Customer', 'Issue Date', 'Due Date', 'Amount', 'Status', 'Actions'].map((h) => (
-                <th
-                  key={h}
-                  className="text-left py-3 px-4 text-xs font-semibold text-slate-400 
-                             uppercase tracking-wider"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading
-              ? Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i} className="border-b border-slate-700/30">
-                    {Array.from({ length: 7 }).map((__, j) => (
-                      <td key={j} className="py-3 px-4">
-                        <div className="h-4 bg-slate-700/50 rounded animate-pulse" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              : invoices.length > 0
-              ? invoices.map((inv) => (
-                  <tr key={inv.id} className="table-row">
-                    <td className="py-3 px-4 font-mono text-blue-400 text-xs font-medium">
-                      {inv.invoiceNumber}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="font-medium text-slate-200">{inv.customer?.name}</div>
-                      <div className="text-xs text-slate-500">{inv.customer?.email}</div>
-                    </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-700/50">
+                <th className="text-left py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Invoice</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Client</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Issue Date</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Amount</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Status</th>
+                <th className="text-right py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider text-xs">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                  </td>
+                </tr>
+              ) : filteredInvoices.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-slate-500">
+                    No invoices found.
+                  </td>
+                </tr>
+              ) : (
+                filteredInvoices.map((inv) => (
+                  <tr key={inv.id} className="border-b border-slate-700/30 hover:bg-slate-800/20 transition-colors">
+                    <td className="py-3 px-4 font-mono text-blue-400 font-medium">{inv.invoiceNumber}</td>
+                    <td className="py-3 px-4 text-slate-300 font-medium">{inv.customer?.name}</td>
                     <td className="py-3 px-4 text-slate-400">{formatDate(inv.issueDate)}</td>
-                    <td className="py-3 px-4 text-slate-400">{formatDate(inv.dueDate)}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-100">
-                      {formatCurrency(inv.totalAmount)}
-                    </td>
-                    <td className="py-3 px-4"><Badge status={inv.status} /></td>
+                    <td className="py-3 px-4 font-semibold text-slate-100">{formatCurrency(inv.totalAmount)}</td>
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        <Link to={`/invoices/${inv.id}/edit`}>
-                          <button className="p-1.5 text-slate-400 hover:text-blue-400 
-                                             hover:bg-blue-500/10 rounded-lg transition-all"
-                                  title="Edit">
-                            <FiEdit2 size={14} />
-                          </button>
-                        </Link>
-                        {inv.status === 'DRAFT' && (
-                          <button
-                            onClick={() => sendMutation.mutate(inv.id)}
-                            className="p-1.5 text-slate-400 hover:text-green-400 
-                                       hover:bg-green-500/10 rounded-lg transition-all"
-                            title="Send invoice"
-                          >
-                            <FiSend size={14} />
-                          </button>
-                        )}
-                        <button
+                      <Badge status={inv.status} />
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
                           onClick={() => handleDownload(inv.id, inv.invoiceNumber)}
-                          className="p-1.5 text-slate-400 hover:text-purple-400 
-                                     hover:bg-purple-500/10 rounded-lg transition-all"
+                          className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
                           title="Download PDF"
                         >
-                          <FiDownload size={14} />
+                          <FiDownload size={16} />
                         </button>
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Delete this invoice?')) {
-                              deleteMutation.mutate(inv.id)
-                            }
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-red-400 
-                                     hover:bg-red-500/10 rounded-lg transition-all"
-                          title="Delete"
-                        >
-                          <FiTrash2 size={14} />
-                        </button>
+                        
+                        {inv.status !== 'Paid' && (
+                          <button 
+                            onClick={() => handleMarkPaid(inv.id)}
+                            className="p-2 text-slate-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+                            title="Mark as Paid"
+                          >
+                            <FiCheckCircle size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
                 ))
-              : (
-                <tr>
-                  <td colSpan={7} className="py-14 text-center text-slate-500">
-                    <p className="text-lg mb-2">No invoices found</p>
-                    <Link to="/invoices/new" className="text-blue-400 hover:text-blue-300 text-sm">
-                      Create your first invoice
-                    </Link>
-                  </td>
-                </tr>
-              )
-            }
-          </tbody>
-        </table>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700/50">
-            <p className="text-xs text-slate-400">
-              Page {page + 1} of {totalPages}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page === 0}
-                onClick={() => setPage(p => p - 1)}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page >= totalPages - 1}
-                onClick={() => setPage(p => p + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )
