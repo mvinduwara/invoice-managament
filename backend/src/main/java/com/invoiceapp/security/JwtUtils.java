@@ -19,7 +19,6 @@ public class JwtUtils {
     private int jwtExpirationMs;
 
     private Key key() {
-        // Correctly converts the string to bytes
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -42,9 +41,17 @@ public class JwtUtils {
         try {
             Jwts.parserBuilder().setSigningKey(key()).build().parseClaimsJws(authToken);
             return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            System.err.println("JWT Validation Error: " + e.getMessage());
-            return false;
+        } catch (SignatureException e) {
+            System.err.println("JWT ERROR: Invalid signature: " + e.getMessage());
+        } catch (MalformedJwtException e) {
+            System.err.println("JWT ERROR: Invalid token: " + e.getMessage());
+        } catch (ExpiredJwtException e) {
+            System.err.println("JWT ERROR: Token is expired: " + e.getMessage());
+        } catch (UnsupportedJwtException e) {
+            System.err.println("JWT ERROR: Token is unsupported: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            System.err.println("JWT ERROR: Token claims string is empty: " + e.getMessage());
         }
+        return false;
     }
 }

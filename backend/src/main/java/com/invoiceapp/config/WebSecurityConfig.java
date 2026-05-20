@@ -2,6 +2,7 @@ package com.invoiceapp.config;
 
 import com.invoiceapp.security.AuthEntryPointJwt;
 import com.invoiceapp.security.AuthTokenFilter;
+import com.invoiceapp.security.JwtUtils;
 import com.invoiceapp.security.UserDetailsServiceImpl;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,15 +26,19 @@ public class WebSecurityConfig {
 
     private final UserDetailsServiceImpl userDetailsService;
     private final AuthEntryPointJwt unauthorizedHandler;
+    private final JwtUtils jwtUtils;
 
-    public WebSecurityConfig(UserDetailsServiceImpl userDetailsService, AuthEntryPointJwt unauthorizedHandler) {
+    public WebSecurityConfig(UserDetailsServiceImpl userDetailsService,
+                             AuthEntryPointJwt unauthorizedHandler,
+                             JwtUtils jwtUtils) {
         this.userDetailsService = userDetailsService;
         this.unauthorizedHandler = unauthorizedHandler;
+        this.jwtUtils = jwtUtils;
     }
 
     @Bean
     public AuthTokenFilter authenticationJwtTokenFilter() {
-        return new AuthTokenFilter();
+        return new AuthTokenFilter(jwtUtils, userDetailsService);
     }
 
     @Bean
@@ -72,7 +77,8 @@ public class WebSecurityConfig {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/api/auth/**").permitAll()
+                        // FIX: Added "/error" here so missing endpoints return 404 instead of 401
+                        auth.requestMatchers("/api/auth/**", "/error").permitAll()
                                 .anyRequest().authenticated()
                 );
         http.authenticationProvider(authenticationProvider());
