@@ -20,6 +20,7 @@ const schema = z.object({
 })
 
 export default function Register() {
+  // Aliased as registerUser so it doesn't conflict with react-hook-form
   const { register: registerUser } = useAuth()
   const [showPass, setShowPass]    = useState(false)
   const [loading, setLoading]      = useState(false)
@@ -32,10 +33,21 @@ export default function Register() {
   const onSubmit = async (data) => {
     setLoading(true)
     try {
-      const { confirmPassword, ...payload } = data
+      const { confirmPassword, ...restData } = data
+      
+      const payload = {
+        ...restData,
+        username: data.email // Maps email to Spring Boot's required username field
+      }
+      
       await registerUser(payload)
+      // No navigate() needed here anymore, AuthContext handles it!
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Registration failed. Please try again.')
+      const errorData = err.response?.data
+      const errorMessage = typeof errorData === 'string' 
+        ? errorData 
+        : errorData?.message || 'Registration failed. Please try again.'
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -44,14 +56,12 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 
-                        bg-blue-600/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-lg relative">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 
-                          bg-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/25">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/25">
             <FiZap size={24} className="text-white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-100">Create Account</h1>
@@ -61,7 +71,6 @@ export default function Register() {
         <div className="glass-card p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              {/* First Name */}
               <div>
                 <label className="form-label">First Name <span className="text-red-400">*</span></label>
                 <div className="relative">
@@ -75,7 +84,6 @@ export default function Register() {
                 {errors.firstName && <p className="form-error">{errors.firstName.message}</p>}
               </div>
 
-              {/* Last Name */}
               <div>
                 <label className="form-label">Last Name <span className="text-red-400">*</span></label>
                 <input
@@ -87,7 +95,6 @@ export default function Register() {
               </div>
             </div>
 
-            {/* Email */}
             <div>
               <label className="form-label">Email <span className="text-red-400">*</span></label>
               <div className="relative">
@@ -102,7 +109,6 @@ export default function Register() {
               {errors.email && <p className="form-error">{errors.email.message}</p>}
             </div>
 
-            {/* Company Name */}
             <div>
               <label className="form-label">Company Name</label>
               <div className="relative">
@@ -115,7 +121,6 @@ export default function Register() {
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label className="form-label">Password <span className="text-red-400">*</span></label>
               <div className="relative">
@@ -129,8 +134,7 @@ export default function Register() {
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 
-                             hover:text-slate-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
                 >
                   {showPass ? <FiEyeOff size={16} /> : <FiEye size={16} />}
                 </button>
@@ -138,7 +142,6 @@ export default function Register() {
               {errors.password && <p className="form-error">{errors.password.message}</p>}
             </div>
 
-            {/* Confirm Password */}
             <div>
               <label className="form-label">Confirm Password <span className="text-red-400">*</span></label>
               <input
