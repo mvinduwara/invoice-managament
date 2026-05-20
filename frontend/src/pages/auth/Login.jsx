@@ -25,9 +25,19 @@ export default function Login() {
   const onSubmit = async (data) => {
     setLoading(true)
     try {
-      await login(data)
+      const payload = {
+        username: data.email, 
+        password: data.password
+      }
+      
+      await login(payload)
+      // No navigate() needed here anymore, AuthContext handles it!
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed. Please try again.')
+      const errorData = err.response?.data
+      const errorMessage = typeof errorData === 'string' 
+        ? errorData 
+        : errorData?.message || 'Login failed. Please try again.'
+      toast.error(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -35,27 +45,21 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-      {/* Background glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 
-                        bg-blue-600/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-md relative">
-        {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 
-                          bg-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/25">
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-500/25">
             <FiZap size={24} className="text-white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-100">InvoiceFlow</h1>
           <p className="text-slate-400 mt-2">Sign in to your account</p>
         </div>
 
-        {/* Card */}
         <div className="glass-card p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* Email */}
             <div>
               <label className="form-label">
                 Email Address <span className="text-red-400">*</span>
@@ -72,7 +76,6 @@ export default function Login() {
               {errors.email && <p className="form-error">{errors.email.message}</p>}
             </div>
 
-            {/* Password */}
             <div>
               <label className="form-label">
                 Password <span className="text-red-400">*</span>
@@ -88,8 +91,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 
-                             hover:text-slate-300 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
                 >
                   {showPass ? <FiEyeOff size={16} /> : <FiEye size={16} />}
                 </button>
@@ -97,15 +99,13 @@ export default function Login() {
               {errors.password && <p className="form-error">{errors.password.message}</p>}
             </div>
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
               className="btn-primary w-full justify-center py-3 mt-2"
             >
               {loading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent 
-                                rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : 'Sign In'}
             </button>
           </form>
